@@ -126,7 +126,7 @@ jobs:
 
           mkdir -p "$PROJECT_DIR/build"
 
-          godot --headless --path "$PROJECT_DIR" \
+          godot --headless --verbose --path "$PROJECT_DIR" \
             --export-debug "Android" \
             "$PROJECT_DIR/build/LegendsOfEldoria.apk"
 
