@@ -1,10 +1,10 @@
 
 name: Gerar APK Android
 
-on:
+"on":
   workflow_dispatch:
   push:
-    branches: [principal]
+    branches: [main]
 
 jobs:
   build:
