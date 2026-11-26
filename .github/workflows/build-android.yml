@@ -114,14 +114,24 @@ jobs:
       - name: Importar projeto
         run: godot --headless --editor --path "$PROJECT_DIR" --import
 
+      
       - name: Gerar APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
+          adb start-server
+          adb devices
+
           mkdir -p "$PROJECT_DIR/build"
-          godot --headless --path "$PROJECT_DIR" --export-debug "Android" "$PROJECT_DIR/build/LegendsOfEldoria.apk"
+
+          godot --headless --path "$PROJECT_DIR" \
+            --export-debug "Android" \
+            "$PROJECT_DIR/build/LegendsOfEldoria.apk"
+
+          test -f "$PROJECT_DIR/build/LegendsOfEldoria.apk"
+
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
