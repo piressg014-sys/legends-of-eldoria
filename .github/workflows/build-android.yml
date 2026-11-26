@@ -1,1 +1,116 @@
 
+name: Gerar APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [principal]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar arquivos
+        uses: actions/checkout@v4
+
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar ferramentas Android
+        run: |
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Baixar projeto do jogo
+        run: |
+          mkdir -p extracted
+          ZIP=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          test -n "$ZIP"
+          unzip -q "$ZIP" -d extracted
+          PROJECT=$(find extracted -name project.godot -printf '%h\n' | head -n 1)
+          test -n "$PROJECT"
+          echo "PROJECT_DIR=$PROJECT" >> $GITHUB_ENV
+
+      - name: Instalar Godot 4.3
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q Godot_v4.3-stable_linux.x86_64.zip
+          sudo mv Godot_v4.3-stable_linux.x86_64 /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+
+      - name: Instalar templates
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+          unzip -q Godot_v4.3-stable_export_templates.tpz -d /tmp/godot-templates
+          cp -a /tmp/godot-templates/templates/. ~/.local/share/godot/export_templates/4.3.stable/
+
+      - name: Configurar exportação Android
+        run: |
+          cd "$PROJECT_DIR"
+          cat > export_presets.cfg <<'EOF'
+          [preset.0]
+          name="Android"
+          platform="Android"
+          runnable=true
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path="build/LegendsOfEldoria.apk"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          encrypt_pck=false
+          encrypt_directory=false
+
+          [preset.0.options]
+          custom_template/debug=""
+          custom_template/release=""
+          gradle_build/use_gradle_build=false
+          architectures/armeabi-v7a=false
+          architectures/arm64-v8a=true
+          architectures/x86=false
+          architectures/x86_64=false
+          version/code=1
+          version/name="1.0"
+          package/unique_name="com.eldoria.game"
+          package/name="Legends of Eldoria"
+          package/signed=true
+          screen/immersive_mode=true
+          EOF
+
+          mkdir -p build
+          keytool -genkeypair -v \
+            -keystore "$RUNNER_TEMP/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+
+      - name: Importar projeto
+        run: godot --headless --editor --path "$PROJECT_DIR" --import
+
+      - name: Gerar APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p "$PROJECT_DIR/build"
+          godot --headless --path "$PROJECT_DIR" --export-debug "Android" "$PROJECT_DIR/build/LegendsOfEldoria.apk"
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Legends-of-Eldoria-APK
+          path: extracted/**/build/LegendsOfEldoria.apk
+          if-no-files-found: error
+
